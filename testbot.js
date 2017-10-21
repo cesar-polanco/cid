@@ -5,7 +5,7 @@ var RTM_EVENTS = require('@slack/client').RTM_EVENTS;
 
 var bot_token = process.env.SLACK_BOT_TOKEN || '';
 
-const HEALTH_CHECK_LOCATION = "https://jenkinsci.wedeploy.io/counts"
+const HEALTH_CHECK_LOCATION = 'https://jenkinsci.wedeploy.io/counts'
 
 var rtm = new RtmClient(bot_token);
 
@@ -21,7 +21,7 @@ rtm.on(CLIENT_EVENTS.RTM.AUTHENTICATED, (rtmStartData) => {
 
 // you need to wait for the client to fully connect before you can send messages
 rtm.on(CLIENT_EVENTS.RTM.RTM_CONNECTION_OPENED, function () {
-  rtm.sendMessage("Hello!", channel);
+  rtm.sendMessage('Hello!', channel);
 });
 
 // New stuff
@@ -33,10 +33,10 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     // Check for the type of action to take
     var output;
     switch(checkForCommand(message)) {
-      case "jenkinsHealthCheck":
+      case 'jenkinsHealthCheck':
         output = getJenkinsSlavesHealth(message);
         break;
-      case "sayHello":
+      case 'sayHello':
         output = getHello(message);
         break;
       default:
@@ -46,38 +46,38 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     if (output !== undefined) {
       rtm.sendMessage(output, message.channel);
     } else {
-      rtm.sendMessage("Technical Issues, please stand by.", message.channel);
+      rtm.sendMessage('Technical Issues, please stand by.', message.channel);
     }
   }
 
 });
 
 function checkIfForBot(input) {
-  return input.text.toLowerCase().includes("cid");
+  return input.text.toLowerCase().includes('cid');
 }
 
 function checkForCommand(message) {
   var command = message.text.toLowerCase();
-  if (command.includes("jenkins slave status")) {
-    return "jenkinsHealthCheck";
-  } else if (command.includes("hello")) {
-    return "sayHello";
+  if (command.includes('jenkins slave status')) {
+    return 'jenkinsHealthCheck';
+  } else if (command.includes('hello')) {
+    return 'sayHello';
   } else {
-    return "help";
+    return 'help';
   }
 }
 
 function getHello(messObj) {
-  var result = "Hello <@" + messObj.user + ">!"
+  var result = 'Hello <@' + messObj.user + '>!'
   return result
 }
 
 function getHelpMessage() {
-  var result = "I didn't understand what you said\nHere are some of the " +
-              "things that I can do:\n----------------------\nJenkins Slave " +
-              "Status: Check on the " +
-              "health of the Jenkins Cluster\n\n Or you can always just " +
-              "say 'Hello!'";
+  var result = 'I didn\'t understand what you said\nHere are some of the ' +
+              'things that I can do:\n----------------------\nJenkins Slave ' +
+              'Status: Check on the ' +
+              'health of the Jenkins Cluster\n\n Or you can always just ' +
+              'say "Hello!"';
   return result;
 }
 
@@ -88,29 +88,31 @@ function getJenkinsSlavesHealth(message) {
       let slaveStatusObject = JSON.parse(body);
       console.log('Response: ', slaveStatusObject);
       result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
-              ' slaves offline.';
+              ' slaves offline. The master with the most offline slaves is ' +
+              getMostOfflineSlaves(slaveStatusObject) + '.';
     } else {
-      result = "HTTP Error: " + res.statusCode + " occurred.";
+      result = 'HTTP Error: ' + res.statusCode + ' occurred.';
     }
 
     rtm.sendMessage(result, message.channel);
 
   });
-  return "One moment...";
+  return 'One moment...';
 }
 
-function sendJenkinsSlavesHealth(error, response, body, channel) {
-  var result;
-  if (response.statusCode === 200 && !error) {
-    let slaveStatusObject = JSON.parse(body);
-    console.log('Response: ', slaveStatusObject);
-    result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
-            ' slaves offline.';
-  } else {
-    result = "HTTP Error: " + response.statusCode + " occurred.";
+function getMostOfflineSlaves(slaves) {
+  var maxNow = slaves['test-1-1'];
+  var maxHostNow = 'test-1-1';
+  for (var key in slaves) {
+    if (slaves.hasOwnProperty(key) && key !== 'offline_slave_count') {
+      if (slaves[key] > maxNow) {
+        maxNow = slaves[key];
+        maxHostNow = key;
+      }
+    }
   }
-
-  rtm.sendMessage(result, channel);
+  return maxHostNow;
 }
+
 
 rtm.start();
