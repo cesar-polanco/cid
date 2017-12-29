@@ -9,6 +9,8 @@ const HEALTH_CHECK_LOCATION = "https://jenkinsci.wedeploy.io/counts"
 
 var rtm = new RtmClient(bot_token);
 
+var brokenSlaves = 0;
+
 let channel;
 
 // The client will emit an RTM.AUTHENTICATED event on successful connection, with the `rtm.start` payload
@@ -39,6 +41,9 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
       case "sayHello":
         output = getHello(message);
         break;
+      case "ws":
+        output = startJSHWatch(message);
+        break;
       default:
         output = getHelpMessage();
     }
@@ -62,6 +67,8 @@ function checkForCommand(message) {
     return "jenkinsHealthCheck";
   } else if (command.includes("hello")) {
     return "sayHello";
+  } else if (command.includes("watch slaves")) {
+    return "ws";
   } else {
     return "help";
   }
@@ -81,14 +88,63 @@ function getHelpMessage() {
   return result;
 }
 
+function startJSHWatch(message) {
+
+  request(HEALTH_CHECK_LOCATION, (err, res, body) => {
+    var result;
+    if (res.statusCode === 200 && !err) {
+      let slaveStatusObject = JSON.parse(body);
+      if (brokenSlaves !== slaveStatusObject['offline_slave_count']) {
+
+        console.log('brokens: ' + brokenSlaves);
+
+        var difference = Math.abs(brokenSlaves - slaveStatusObject['offline_slave_count']);
+        if (brokenSlaves > slaveStatusObject['offline_slave_count']) {
+          result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
+                   ' slaves offline. This is ' + difference + ' fewer than previous.';
+        } else {
+          result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
+                   ' slaves offline. This is ' + difference + ' more than previous.';
+        }
+
+        brokenSlaves = slaveStatusObject['offline_slave_count'];
+      } else {
+        result = 'There are currently ' + brokenSlaves + ' slaves offline.';
+      }
+      console.log('Response: ', slaveStatusObject);
+    } else {
+      result = "HTTP Error: " + res.statusCode + " occurred.";
+    }
+
+    rtm.sendMessage(result, message.channel);
+
+  });
+  return "One moment...";
+}
+
 function getJenkinsSlavesHealth(message) {
   request(HEALTH_CHECK_LOCATION, (err, res, body) => {
     var result;
     if (res.statusCode === 200 && !err) {
       let slaveStatusObject = JSON.parse(body);
+      if (brokenSlaves !== slaveStatusObject['offline_slave_count']) {
+
+        console.log('brokens: ' + brokenSlaves);
+
+        var difference = Math.abs(brokenSlaves - slaveStatusObject['offline_slave_count']);
+        if (brokenSlaves > slaveStatusObject['offline_slave_count']) {
+          result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
+                   ' slaves offline. This is ' + difference + ' fewer than previous.';
+        } else {
+          result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
+                   ' slaves offline. This is ' + difference + ' more than previous.';
+        }
+
+        brokenSlaves = slaveStatusObject['offline_slave_count'];
+      } else {
+        result = 'There are currently ' + brokenSlaves + ' slaves offline.';
+      }
       console.log('Response: ', slaveStatusObject);
-      result = 'There are currently ' + slaveStatusObject['offline_slave_count'] +
-              ' slaves offline.';
     } else {
       result = "HTTP Error: " + res.statusCode + " occurred.";
     }
